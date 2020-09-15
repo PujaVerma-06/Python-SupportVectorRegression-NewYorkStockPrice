@@ -1,0 +1,142 @@
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.svm import SVR
+from prettytable import PrettyTable
+import statistics
+
+stock_data = pd.read_csv('D:/Masters/Semester2/Machine Learning/Assignment2/Datasets/nyse/prices.csv')
+stock_securities = pd.read_csv('D:/Masters/Semester2/Machine Learning/Assignment2/Datasets/nyse/securities.csv')
+stock_data.head()
+
+## Data Exploration:
+plt.figure(figsize=(10, 5));
+plt.plot(stock_data[stock_data.symbol == 'XOM'].open.values, color='green', label='Open Price')
+plt.plot(stock_data[stock_data.symbol == 'XOM'].close.values, color='red', label='Close Price')
+plt.title('XOM')
+plt.xlabel('time [days]')
+plt.ylabel('Price')
+plt.legend(loc='best');
+
+plt.figure(figsize=(10, 5));
+plt.plot(stock_data[stock_data.symbol == 'CERN'].open.values, color='green', label='Open Price')
+plt.plot(stock_data[stock_data.symbol == 'CERN'].close.values, color='red', label='Close Price')
+plt.title('CERN')
+plt.xlabel('time [days]')
+plt.ylabel('Price')
+plt.legend(loc='best');
+
+plt.figure(figsize=(10, 5));
+plt.plot(stock_data[stock_data.symbol == 'UPS'].open.values, color='green', label='Open Price')
+plt.plot(stock_data[stock_data.symbol == 'UPS'].close.values, color='red', label='Close Price')
+plt.title('UPS')
+plt.xlabel('time [days]')
+plt.ylabel('Price')
+plt.legend(loc='best');
+
+plt.figure(figsize=(10, 5));
+plt.plot(stock_data[stock_data.symbol == 'LKQ'].open.values, color='green', label='Open Price')
+plt.plot(stock_data[stock_data.symbol == 'LKQ'].close.values, color='red', label='Close Price')
+plt.title('LKQ')
+plt.xlabel('time [days]')
+plt.ylabel('Price')
+plt.legend(loc='best');
+
+plt.figure(figsize=(10, 5));
+plt.plot(stock_data[stock_data.symbol == 'MTD'].open.values, color='green', label='Open Price')
+plt.plot(stock_data[stock_data.symbol == 'MTD'].close.values, color='red', label='Close Price')
+plt.title('MTD')
+plt.xlabel('time [days]')
+plt.ylabel('Price')
+plt.legend(loc='best');
+
+plt.figure(figsize=(10, 5));
+plt.plot(stock_data[stock_data.symbol == 'XOM'].open.values, color='green', label='XOM')
+plt.plot(stock_data[stock_data.symbol == 'CERN'].open.values, color='red', label='CERN')
+plt.plot(stock_data[stock_data.symbol == 'UPS'].open.values, color='blue', label='UPS')
+plt.plot(stock_data[stock_data.symbol == 'LKQ'].open.values, color='black', label='LKQ')
+plt.plot(stock_data[stock_data.symbol == 'MTD'].open.values, color='yellow', label='MTD')
+plt.title('Stock Open Price')
+plt.xlabel('time [days]')
+plt.ylabel('Open Price')
+plt.legend(loc='best');
+
+plt.figure(figsize=(10, 5));
+plt.plot(stock_data[stock_data.symbol == 'XOM'].close.values, color='green', label='XOM')
+plt.plot(stock_data[stock_data.symbol == 'CERN'].close.values, color='red', label='CERN')
+plt.plot(stock_data[stock_data.symbol == 'UPS'].close.values, color='blue', label='UPS')
+plt.plot(stock_data[stock_data.symbol == 'LKQ'].close.values, color='black', label='LKQ')
+plt.plot(stock_data[stock_data.symbol == 'MTD'].open.values, color='yellow', label='MTD')
+plt.title('Stock Close Price')
+plt.xlabel('time [days]')
+plt.ylabel('Close Price')
+plt.legend(loc='best');
+
+
+## One day ahead stock prediction:
+stock_symbols_list = list(set(stock_data['symbol']))
+#print(stock_symbols_list)
+
+def predict_prices(index, data, x):
+    index = np.reshape(index,(len(index), 1)) # convert to 1xn dimension
+    x = np.reshape(x,(len(x), 1))
+    svr_rbf = SVR(kernel='rbf', C=1e3, gamma=0.1)
+    svr_rbf.fit(index, data)
+    return svr_rbf.predict(x)[0]
+
+stock_predicted_table = PrettyTable(['Stock', 'Name', 'Open', 'Close'])
+count = 0
+rms = []
+
+for stock_symbol in stock_symbols_list:
+    #Get all of the data except for the last row
+    count = count+1
+    name = stock_securities[stock_securities.Symbol == stock_symbol].Security.values
+    print('Running for stock: ',stock_symbol)
+    stock_symbol_data = stock_data[stock_data['symbol'] == stock_symbol]
+    stock_symbol_train = stock_symbol_data.head(len(stock_symbol_data)-1)
+    stock_symbol_valid = stock_symbol_data.tail(1)
+    
+    num = range(1,len(stock_symbol_train)+1)
+    dates = []
+    dates = list(num)
+
+    price_open = []
+    price_close = []
+
+    stock_symbol_train_open = stock_symbol_train.loc[:,'open'] 
+    stock_symbol_valid_open = float(stock_symbol_valid.loc[:,'open'])
+    stock_symbol_train_close = stock_symbol_train.loc[:,'close'] 
+    stock_symbol_valid_close = float(stock_symbol_valid.loc[:,'close'])
+
+    for open_price in stock_symbol_train_open:
+        price_open.append(float(open_price))
+      
+    for close_price in stock_symbol_train_close:
+        price_close.append(float(close_price))
+        
+    
+    predicted_open_price = predict_prices(dates, price_open, [len(stock_symbol_train_open)+1])
+    predicted_close_price = predict_prices(dates, price_close, [len(stock_symbol_train_close)+1])
+
+    error = []
+    error_open = np.sqrt(np.mean(np.power((np.array(stock_symbol_valid_open)-np.array(predicted_open_price)),2)))
+    error.append(error_open)
+    error_close = np.sqrt(np.mean(np.power((np.array(stock_symbol_valid_close)-np.array(predicted_close_price)),2)))
+    error.append(error_close)
+      
+    avg_error = statistics.mean(error) 
+    rms.append(avg_error)
+    
+    print('Inserting into the table')
+    stock_predicted_table.add_row([stock_symbol, name[0], round(predicted_open_price,2), round(predicted_close_price,2)])
+    
+    if count == 20:
+        break
+    
+avg_rms = statistics.mean(rms) 
+
+print(stock_predicted_table)
+print('RMSE Value: ',round(avg_rms,2))
+
